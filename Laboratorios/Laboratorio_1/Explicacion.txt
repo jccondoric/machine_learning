@@ -1,0 +1,24 @@
+Algoritmo empleado: Descenso por Gradiente (Batch Gradient Descent)
+
+El descenso por gradiente es un algoritmo iterativo de optimización que permite encontrar 
+los valores de b y w que minimizan el error entre las predicciones del modelo y los datos reales, 
+sin necesidad de resolver una ecuación cerrada.
+
+El algoritmo parte de b=0 y w=0 (una recta plana, sin información) y en cada iteración:
+
+1. Recorre las n observaciones del dataset y calcula el error de predicción de cada una.
+2. Acumula esos errores para obtener el gradiente respecto a b y respecto a w (las sumatorias de la fórmula).
+3. Actualiza b y w moviéndolos en dirección **contraria** al gradiente, ya que el gradiente apunta hacia donde el error *aumenta*, y buscamos justamente lo contrario: que el error disminuya.
+4. El tamaño de cada paso está controlado por la tasa de aprendizaje α (alpha = 0.01 en este programa). Un α muy grande puede hacer que el algoritmo "salte" el mínimo y no converja; uno muy pequeño hace que el entrenamiento sea innecesariamente lento.
+5. Este proceso se repite hasta que el error deja de cambiar de forma significativa entre una iteración y la siguiente (diferencia menor a 1e-6), lo que indica que el algoritmo ya llegó (o está muy cerca) del mínimo de la función de costo. A esto se le llama **convergencia**.
+
+En este programa, la convergencia se alcanzó en la iteración 3262 (de un máximo de 20000 permitidas), lo que confirma que el algoritmo encontró una solución estable antes de agotar el límite de iteraciones.
+
+Interpretación de los resultados obtenidos
+
+- b = 25792.18: es el salario base teórico que el modelo predice para una persona con 0 años de experiencia.
+- w = 9449.97: es el incremento promedio de salario por cada año adicional de experiencia. Es decir, según este modelo, cada año de experiencia aporta aproximadamente $9,449.97 al salario esperado.
+- Costo final ≈ 31,270,951.72: representa el error cuadrático medio residual del modelo. Al estar en unidades de dólares al cuadrado, este número por sí solo no es muy intuitivo, pero su raíz cuadrada (≈ $5,592) da una idea aproximada de cuánto se desvían, en promedio, las predicciones del modelo respecto a los salarios reales.
+
+Las predicciones sobre los 10 valores nuevos de x muestran una relación lineal creciente y consistente: a mayor años de experiencia, mayor salario estimado, siguiendo fielmente la fórmula aprendida y = b + wx. Estos 10 valores no fueron usados durante el entrenamiento (a diferencia de las 30 filas del dataset original), por lo que representan un caso real de **inferencia**: usar un modelo y
+a entrenado para predecir sobre datos nuevos que nunca vio.
