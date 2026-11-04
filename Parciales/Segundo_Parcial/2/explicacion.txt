@@ -1,0 +1,79 @@
+EXPLICACION DEL TRABAJO
+Torre de Hanoi con aprendizaje por refuerzo
+
+Archivo del codigo: torre_de_hanoi.ipynb
+
+
+1. El juego que elegi
+
+Elegi la Torre de Hanoi con 3 postes y 7 discos. Los postes se llaman A, B y C. Al empezar, los 7 discos estan en el poste A, con el mas grande abajo y el mas pequeno arriba. El objetivo es pasarlos todos al poste C.
+
+Las reglas son dos:
+- Solo se puede mover un disco por turno, y es el que esta arriba de un poste.
+- Un disco grande nunca puede quedar encima de uno mas pequeno.
+
+Con 7 discos la solucion mas corta tiene 127 movimientos (2 elevado a 7, menos 1). Ese numero me sirve para saber si el agente aprendio bien, porque mas de 127 significa que da vueltas de mas.
+
+
+2. De donde parti
+
+Parti de los notebooks del tres en raya (00_intro y 01_introduccion). De ahi tome la forma de organizar el codigo: una clase para el tablero con valid_moves, update e is_game_over, y una clase Agent con un metodo move que a veces explora y a veces elige lo mejor que conoce. Tambien deje el entrenamiento con tqdm y el guardado del agente con pickle.
+
+Lo que no pude copiar es la clase Game con el autojuego. En el tres en raya hay dos jugadores que se enfrentan, pero la Torre de Hanoi la juega una sola persona, asi que no hay oponente. Por eso el entrenamiento lo hace una funcion simple que repite episodios.
+
+El otro cambio fue en la actualizacion de la tabla. En el tres en raya la tabla se actualiza al terminar la partida, recorriendo los estados hacia atras. Aqui la recompensa que importa solo aparece al llegar a la meta, y al principio el agente se mueve casi al azar, asi que casi nunca llegaba. Por eso actualizo la tabla despues de cada movimiento (Q-learning tabular), que sigue siendo un metodo basico y no usa nada avanzado. Tambien cambie algo del Agent: en el tres en raya el agente solo elegia entre las casillas libres, y aqui deje que elija entre las 6 acciones y aprenda las reglas con una penalizacion.
+
+
+3. Los elementos del aprendizaje por refuerzo en el codigo
+
+Entorno. Es la clase Torre. Guarda el estado y se encarga de las reglas. El metodo valid_moves devuelve solo los movimientos permitidos: mira el disco que esta arriba del poste de origen y solo lo deja pasar si el poste de destino esta vacio o tiene arriba un disco mas grande. Asi las dos reglas del juego quedan dentro del entorno. El metodo update hace el movimiento y lanza un error si es ilegal. El metodo step es el que usa el agente al entrenar: si el movimiento es legal lo hace y devuelve -1, y si es ilegal no cambia nada y devuelve -10. Por ultimo, is_game_over dice si todos los discos ya estan en el poste C.
+
+Estado. Es una tupla de 7 numeros. La posicion i de la tupla dice en que poste esta el disco i, donde el disco 0 es el mas pequeno. Los postes A, B y C se guardan como 0, 1 y 2. El inicio es (0, 0, 0, 0, 0, 0, 0) y la meta es (2, 2, 2, 2, 2, 2, 2). Como cada disco puede estar en 3 postes, hay 3 elevado a 7, es decir 2187 estados posibles. Con esa representacion no hace falta guardar el orden de los discos, porque dentro de un poste siempre estan ordenados de mayor a menor.
+
+Acciones. Son los 6 movimientos entre postes: AB, AC, BA, BC, CA y CB. Estan en la lista ACCIONES, y el agente trabaja con el numero de la accion. El agente puede elegir cualquiera de las 6 en cualquier estado, aunque solo algunas son legales.
+
+Recompensa. Cada movimiento da -1 y llegar a la meta no suma nada extra. Como el agente quiere sacar la mayor recompensa posible, le conviene gastar menos movimientos, y por eso termina buscando el camino mas corto sin que yo le diga cual es. Si intenta un movimiento ilegal, por ejemplo poner un disco grande sobre uno pequeno, el disco no se mueve y recibe -10. Asi el agente aprende las reglas por si solo, porque los movimientos ilegales le salen caros.
+
+Funcion de valor. Es la tabla self.q de la clase Agent. Es un diccionario donde la clave es el estado y el valor es un vector de 6 numeros, uno por accion, que dice que tan buena es cada accion desde ese estado. Empieza en 0 para todo. Como las recompensas son negativas, una accion que todavia no se probo vale mas que una ya probada, y eso empuja al agente a probar cosas nuevas.
+
+Politica. Es el metodo move del Agent. Con probabilidad prob_exp (0.05) elige una de las 6 acciones al azar, que es la exploracion. El resto de las veces mira el vector de valores del estado actual y elige la accion con el valor mas alto, sin filtrar cuales son legales, y si hay empate escoge una de las empatadas al azar. Un movimiento ilegal que ya se probo tiene un valor muy bajo, asi que el agente deja de elegirlo. Cuando se evalua al agente se llama con explore=False y entonces siempre usa lo aprendido.
+
+Modelo del entorno. El agente no usa ningun modelo, aprende solo probando.
+
+
+4. Como aprende
+
+Despues de cada movimiento se actualiza el valor de la accion que se acaba de hacer. A su valor viejo se le suma una parte (alpha) de la diferencia entre lo que paso y lo que se esperaba. Lo que paso es la recompensa (-1, o -10 si el movimiento fue ilegal) mas el mejor valor que se puede conseguir desde el estado nuevo, que si el movimiento fue ilegal es el mismo estado de antes. La formula es:
+
+Q(s, a) = Q(s, a) + alpha * ( recompensa + gamma * max Q(s', a') - Q(s, a) )
+
+Si el movimiento deja el juego terminado, ya no hay estado siguiente y se usa solo la recompensa. Los valores que use fueron alpha = 0.5, gamma = 1 y prob_exp = 0.05.
+
+Para el entrenamiento hice 3000 episodios con un limite de 2000 pasos por episodio (cada intento cuenta como un paso, tambien los ilegales). El limite sirve para que un episodio no dure para siempre al principio. En la grafica se ve que al empezar el agente necesita cerca de 1800 pasos, y hacia el episodio 1500 ya baja a unos 135, que es casi el minimo. No llega justo a 127 durante el entrenamiento porque todavia hace movimientos al azar de vez en cuando, y a veces intenta alguno ilegal.
+
+
+5. Resultados
+
+Al evaluarlo sin exploracion, el agente resuelve los 7 discos en 127 movimientos, igual que el minimo teorico, y sin ningun intento ilegal, es decir que aprendio las reglas. La tabla termina con 2186 estados: los 2187 posibles menos el estado meta, desde el cual ya no hay que hacer nada.
+
+Tambien lo probe con 3 discos, donde el minimo es 7 movimientos, y llega a 7.
+
+
+6. Jugar contra el agente
+
+En el notebook hay una parte para jugar uno mismo. Cada movimiento se escribe con la letra del poste de origen y la del destino, por ejemplo AC para mover el disco de arriba del poste A al poste C. Si el movimiento no se puede, el programa dice por que: el poste esta vacio, el origen y el destino son iguales, o el disco que se quiere mover es mas grande que el que esta arriba del destino. Con S la persona se rinde.
+
+Cuando la persona termina, el agente resuelve el mismo juego desde el inicio y se muestran los movimientos de los dos, el minimo posible y la secuencia que uso el agente. La parte de jugar se hace con 3 discos porque con 7 hay que hacer 127 movimientos a mano, aunque se puede cambiar el numero.
+
+
+7. Limitaciones
+
+- La tabla guarda un valor por cada estado, asi que crece como 3 elevado al numero de discos. Con 7 discos es chica, pero con 15 o 20 discos ya seria demasiado y haria falta otra tecnica.
+- El agente solo sabe resolver el numero de discos con el que se entreno. Para otro numero hay que entrenar otro agente.
+- Si se entrena con pocos episodios el agente no alcanza a aprender. Con 7 discos y 600 episodios no logro resolver el juego (en una prueba se quedo repitiendo un movimiento ilegal que todavia no habia probado), y con 1500 o mas episodios resolvio en 127 movimientos y sin intentos ilegales en todas las pruebas que hice (5 semillas distintas).
+- Los valores de alpha, gamma, prob_exp y la penalizacion de -10 los deje fijos, no hice una busqueda sistematica de los mejores.
+
+
+8. Como ejecutarlo
+
+Se abre torre_de_hanoi.ipynb en Colab y se ejecutan las celdas en orden. El numero de discos se cambia con la variable N_DISCOS, que esta en una celda al inicio, y despues se vuelve a ejecutar todo desde arriba (probe con 5 y con 7). Entrenar con 7 discos tarda menos de un minuto. Al final el agente entrenado se guarda en agente_hanoi.pickle.
